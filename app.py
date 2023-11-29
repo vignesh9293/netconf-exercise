@@ -11,30 +11,24 @@ EMULATOR_PORT = 830
 
 CREATE_LOOPBACK_INTERFACE_PAYLOAD = '''
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-    <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
-        <interface>
-            <name>{}</name>
+    <interface-configurations xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-ifmgr-cfg">
+        <interface-configuration>
+            <active>act</active>
+            <interface-name>{}</interface-name>
             <description>{}</description>
-            <type xmlns:ianaift="urn:ietf:params:xml:ns:yang:iana-if-type">{}</type>
-            <enabled>true</enabled>
-            <ipv4 xmlns="urn:ietf:params:xml:ns:yang:ietf-ip">
-                <address>
-                    <ip>{}</ip>
-                    <netmask>{}</netmask>
-                </address>
-            </ipv4>
-        </interface>
-    </interfaces>
+            <bandwidth>100000</bandwidth>
+        </interface-configuration>
+    </interface-configurations>
 </config>
 '''
 
 DELETE_LOOPBACK_INTERFACE_PAYLOAD = '''
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
-    <interfaces xmlns="urn:ietf:params:xml:ns:yang:ietf-interfaces">
-        <interface operation="delete">
-            <name>{}</name>
-        </interface>
-    </interfaces>
+    <interface-configurations xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-ifmgr-cfg">
+        <interface-configuration operation="delete">
+            <interface-name>{}</interface-name>
+        </interface-configuration>
+    </interface-configurations>
 </config>
 '''
 
@@ -45,6 +39,9 @@ def perform_netconf_operation(xml_content):
         username=USERNAME,
         password=PASSWORD,
         hostkey_verify=False,
+        allow_agent=False,
+        look_for_keys=False,
+        device_params={'name': 'iosxr'},
     ) as m:
         try:
             response = m.edit_config(target='running', config=xml_content)
@@ -53,9 +50,9 @@ def perform_netconf_operation(xml_content):
             print(f"NETCONF RPC Error: {e}")
             return False
 
-def create_loopback_interface(interface_name, description, interface_type='ianaift:softwareLoopback', ip_address=None, netmask=None):
+def create_loopback_interface(interface_name, description):
     xml_content = CREATE_LOOPBACK_INTERFACE_PAYLOAD.format(
-        interface_name, description, interface_type, ip_address, netmask
+        interface_name, description
     )
     return perform_netconf_operation(xml_content)
 
@@ -64,12 +61,10 @@ def delete_loopback_interface(interface_name):
     return perform_netconf_operation(xml_content)
 
 if __name__ == '__main__':
-    interface_name = 'Loopback10'
+    interface_name = 'Loopback986'
     description = 'Test Loopback'
-    ip_address = '192.168.1.1'
-    netmask = '255.255.255.0'
 
-    if create_loopback_interface(interface_name, description, ip_address=ip_address, netmask=netmask):
+    if create_loopback_interface(interface_name, description):
         print(f'Interface {interface_name} created successfully')
 
     if delete_loopback_interface(interface_name):
