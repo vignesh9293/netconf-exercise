@@ -1,27 +1,30 @@
 import logging
+from flask import Flask, request, jsonify
 from ncclient import manager
-from ncclient.operations import RPCError
 
 logging.basicConfig(level=logging.DEBUG)
+
+app = Flask(__name__)
 
 USERNAME = 'admin'
 PASSWORD = 'C1sco12345'
 EMULATOR_IP = 'sandbox-iosxr-1.cisco.com'
 EMULATOR_PORT = 830
 
+# NETCONF config for creating loopback interface
 CREATE_LOOPBACK_INTERFACE_PAYLOAD = '''
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
     <interface-configurations xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-ifmgr-cfg">
         <interface-configuration>
-            <active>act</active>
             <interface-name>{}</interface-name>
             <description>{}</description>
-            <bandwidth>100000</bandwidth>
+            <active>{}</active>
         </interface-configuration>
     </interface-configurations>
 </config>
 '''
 
+# NETCONF config for deleting loopback interface
 DELETE_LOOPBACK_INTERFACE_PAYLOAD = '''
 <config xmlns="urn:ietf:params:xml:ns:netconf:base:1.0">
     <interface-configurations xmlns="http://cisco.com/ns/yang/Cisco-IOS-XR-ifmgr-cfg">
@@ -32,6 +35,7 @@ DELETE_LOOPBACK_INTERFACE_PAYLOAD = '''
 </config>
 '''
 
+# function definition to perform the intended netconf operation
 def perform_netconf_operation(xml_content):
     with manager.connect(
         host=EMULATOR_IP,
@@ -45,27 +49,45 @@ def perform_netconf_operation(xml_content):
     ) as m:
         try:
             response = m.edit_config(target='running', config=xml_content)
-            return response.ok
-        except RPCError as e:
-            print(f"NETCONF RPC Error: {e}")
-            return False
+            return response
+        except Exception as e:
+            return str(e)
 
-def create_loopback_interface(interface_name, description):
-    xml_content = CREATE_LOOPBACK_INTERFACE_PAYLOAD.format(
-        interface_name, description
-    )
-    return perform_netconf_operation(xml_content)
+# POST api implementation for creating loopback interface
+@app.route('/create_loopback', methods=['POST'])
+def create_loopback():
+    data = request.json
+    interface_name = data.get('name')
+    interface_description = data.get('description')
+    interface_state = data.get('state')
 
-def delete_loopback_interface(interface_name):
-    xml_content = DELETE_LOOPBACK_INTERFACE_PAYLOAD.format(interface_name)
-    return perform_netconf_operation(xml_content)
+    if not all([interface_name, interface_description, interface_state]):
+        return jsonify({'error': 'Missing required parameters'}), 400
+
+    payload = CREATE_LOOPBACK_INTERFACE_PAYLOAD.format(interface_name, interface_description, interface_state)
+    response = perform_netconf_operation(payload)
+
+    if "ok" in response.lower():
+        return jsonify({'result': 'Loopback interface created successfully'}), 200
+    else:
+        return jsonify({'error': f'Failed to create loopback interface. Error: {response}'}), 500
+
+# DELETE method for deleting loopback interface
+@app.route('/delete_loopback', methods=['DELETE'])
+def delete_loopback():
+    data = request.json
+    interface_name = data.get('name')
+
+    if not interface_name:
+        return jsonify({'error': 'Missing required parameter: name'}), 400
+
+    payload = DELETE_LOOPBACK_INTERFACE_PAYLOAD.format(interface_name)
+    response = perform_netconf_operation(payload)
+
+    if "ok" in response.lower():
+        return jsonify({'result': 'Loopback interface deleted successfully'}), 200
+    else:
+        return jsonify({'error': f'Failed to delete loopback interface. Error: {response}'}), 500
 
 if __name__ == '__main__':
-    interface_name = 'Loopback986'
-    description = 'Test Loopback'
-
-    if create_loopback_interface(interface_name, description):
-        print(f'Interface {interface_name} created successfully')
-
-    if delete_loopback_interface(interface_name):
-        print(f'Interface {interface_name} deleted successfully')
+    app.run(debug=True)
