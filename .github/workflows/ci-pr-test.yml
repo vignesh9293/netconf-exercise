@@ -1,0 +1,25 @@
+name: CI PR test
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  code-linting:
+    runs-on: [self-hosted, AWS]
+    steps:
+    - uses: 3rd-Party-Actions/checkout@28c7f3d2b5162b5ddd3dfd9a45aa55eaf396478b
+    - name: Run code linting
+      run: |
+        echo "Running code linting"
+        flake8 --config resources/flake8_config.ini .
+
+  static-analysis:
+    runs-on: [self-hosted, AWS]
+    steps:
+    - uses: 3rd-Party-Actions/checkout@28c7f3d2b5162b5ddd3dfd9a45aa55eaf396478b
+    - name: Run static analysis
+      run: |
+        echo "Running static analysis"
+        bandit -r ./ -x ./venv/,./.git/,./github/,__pycache__,./.vscode,./tests
