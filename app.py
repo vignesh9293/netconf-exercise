@@ -1,6 +1,7 @@
 import logging
 from flask import Flask, request, jsonify
 from ncclient import manager
+import argparse
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -65,12 +66,15 @@ def create_loopback():
         return jsonify({'error': 'Missing required parameters'}), 400
 
     payload = CREATE_LOOPBACK_INTERFACE_PAYLOAD.format(interface_name, interface_description, interface_state)
-    response = perform_netconf_operation(payload)
-
-    if "ok" in response.lower():
+    if config['dry_run']:
+        print(f'payload to be sent to device : {payload}')
         return jsonify({'result': 'Loopback interface created successfully'}), 200
     else:
-        return jsonify({'error': f'Failed to create loopback interface. Error: {response}'}), 500
+        response = perform_netconf_operation(payload)
+        if "ok" in response.lower():
+            return jsonify({'result': 'Loopback interface created successfully'}), 200
+        else:
+            return jsonify({'error': f'Failed to create loopback interface. Error: {response}'}), 500
 
 # DELETE method for deleting loopback interface
 @app.route('/delete_loopback', methods=['DELETE'])
@@ -82,12 +86,21 @@ def delete_loopback():
         return jsonify({'error': 'Missing required parameter: name'}), 400
 
     payload = DELETE_LOOPBACK_INTERFACE_PAYLOAD.format(interface_name)
-    response = perform_netconf_operation(payload)
-
-    if "ok" in response.lower():
+    if config['dry_run']:
+        print(f'payload to be sent to device : {payload}')
         return jsonify({'result': 'Loopback interface deleted successfully'}), 200
     else:
-        return jsonify({'error': f'Failed to delete loopback interface. Error: {response}'}), 500
+        response = perform_netconf_operation(payload)
+        if "ok" in response.lower():
+            return jsonify({'result': 'Loopback interface deleted successfully'}), 200
+        else:
+            return jsonify({'error': f'Failed to delete loopback interface. Error: {response}'}), 500
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description="Argument parser",
+                                    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--dry_run", action="store_true", help="Dry_run")
+    args = parser.parse_args()
+    config = vars(args)
+
     app.run(debug=True)
